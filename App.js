@@ -1,18 +1,18 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { initDatabase } from './utils/database';
 import { registerForPushNotificationsAsync } from './utils/NotificationService';
 import TripLogger from './components/TripLogger';
 import TripHistory from './components/TripHistory';
-import SmartReminder from './components/SmartReminder';
+import EnhancedSmartPlanner from './components/EnhancedSmartPlanner';
 
 const Tab = createBottomTabNavigator();
 
 export default function App() {
   useEffect(() => {
     (async () => {
-      console.log('🚀 App starting...');
+      console.log('🚀 TransitMind starting...');
       
       try {
         // Initialize database
@@ -22,6 +22,8 @@ export default function App() {
         // Setup notifications
         await registerForPushNotificationsAsync();
         console.log('✅ Notifications registered');
+        
+        console.log('🎯 App ready for data collection');
       } catch (err) {
         console.error('❌ Initialization error:', err);
       }
@@ -53,16 +55,16 @@ export default function App() {
           name="History" 
           component={TripHistory}
           options={{
-            title: '📋 Trip History',
+            title: '📋 History',
             tabBarLabel: 'History'
           }}
         />
         <Tab.Screen 
-          name="SmartReminder" 
-          component={SmartReminder}
+          name="HybridPlanner" 
+          component={EnhancedSmartPlanner}
           options={{
-            title: '🧠 Smart Planner',
-            tabBarLabel: 'Smart Planner'
+            title: '🎯 Smart AI',
+            tabBarLabel: 'Smart AI'
           }}
         />
       </Tab.Navigator>

@@ -6,6 +6,7 @@ import { calculateHybridDepartureTime } from '../utils/HybridPredictionEngine';
 import { fetchTrips } from '../utils/database';
 import { scheduleNotification } from '../utils/NotificationService';
 import TransitWidget from './TransitWidget';
+import { isRunningInExpoGo } from '../utils/ExpoGoHelper';
 
 export default function EnhancedSmartPlanner() {
   const [destination, setDestination] = useState('');
@@ -61,30 +62,39 @@ export default function EnhancedSmartPlanner() {
 
   const scheduleHybridReminder = async () => {
     if (!prediction) return;
-
+  
     try {
       const now = new Date();
       const secondsUntilDeparture = (prediction.departureTime - now) / 1000;
-
-      if (secondsUntilDeparture > 60) {
-        await scheduleNotification(
-          `🎯 Hybrid Smart Alert: Leave for ${destination}!`,
-          `${prediction.primaryRoute.description} - ${Math.round(prediction.totalTimeNeeded)}min total`,
-          secondsUntilDeparture
-        );
-
-        Alert.alert(
-          'Hybrid Smart Reminder Set! 🎯',
-          `Leave at ${prediction.departureTime.toLocaleTimeString()}\n` +
-          `Route: ${prediction.primaryRoute.description}\n` +
-          `Confidence: ${Math.round(prediction.confidence * 100)}%\n` +
-          `Data Sources: ${prediction.dataQuality.googleTransit ? '🗺️ Google' : ''} ${prediction.dataQuality.historicalData > 0 ? '🧠 ML' : ''} 🚇 MBTA`
-        );
-      } else {
-        Alert.alert('Leave Now!', 'You should leave immediately to arrive on time!');
+      
+      if (secondsUntilDeparture <= 0) {
+        Alert.alert('Time Error', 'Departure time is in the past!');
+        return;
       }
+      
+      if (secondsUntilDeparture < 60) {
+        Alert.alert('Leave Now!', 'You should leave immediately!');
+        return;
+      }
+  
+      await scheduleNotification(
+        `Time to leave for ${destination}!`,
+        `${prediction.primaryRoute?.description || 'Your trip'} - ${Math.round(prediction.totalTimeNeeded)}min total`,
+        secondsUntilDeparture
+      );
+  
+      // Clean success message (no Expo Go warning needed)
+      Alert.alert(
+        'Smart Reminder Set! 🎯',
+        `Current: ${now.toLocaleTimeString()}\n` +
+        `Leave at: ${prediction.departureTime.toLocaleTimeString()}\n` +
+        `You'll get a notification in ${Math.round(secondsUntilDeparture / 60)} minutes`,
+        [{ text: 'Perfect!' }]
+      );
+      
     } catch (error) {
-      Alert.alert('Error', 'Failed to set hybrid reminder');
+      console.error('❌ Notification scheduling error:', error);
+      Alert.alert('Error', `Failed to set reminder: ${error.message}`);
     }
   };
 
@@ -126,7 +136,6 @@ export default function EnhancedSmartPlanner() {
         onChangeText={setDestination}
       />
       
-      <Text style={styles.label}>Arrival Time</Text>
       <Text style={styles.label}>Arrival Time</Text>
 <TouchableOpacity 
   style={styles.timeButton}
@@ -219,6 +228,7 @@ export default function EnhancedSmartPlanner() {
             title="🔔 Set Hybrid Smart Reminder"
             onPress={scheduleHybridReminder}
           />
+          <View style={{ height: 10 }} />
         </View>
       )}
 

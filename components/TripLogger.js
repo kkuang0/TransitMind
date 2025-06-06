@@ -52,7 +52,7 @@ export default function TripLogger() {
     );
 
     console.log('🧠 ML Features:', mlFeatures);
-    
+
     insertTrip(mlFeatures);
     setTripSaved(true);
     setDestination('');
@@ -66,7 +66,7 @@ export default function TripLogger() {
     const Δλ = (lon2 - lon1) * (Math.PI / 180);
 
     const a = Math.sin(Δφ / 2) ** 2 +
-              Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
@@ -87,21 +87,26 @@ export default function TripLogger() {
         value={destination}
         onChangeText={setDestination}
       />
-      
+
       <Button title="Start Trip" onPress={startTrip} />
       <View style={{ height: 10 }} />
       <Button title="End Trip" onPress={endTrip} disabled={!startLocation} />
-      
+
       <View style={{ height: 20 }} />
-      <Button 
-        title="Reset Database (Dev)" 
-        onPress={() => {
-          resetDatabase();
-          alert('Database reset for ML development');
-        }} 
-        color="red"
-      />
-      
+      {__DEV__ && (
+        <>
+          <View style={{ height: 20 }} />
+          <Button
+            title="🔧 Reset Database (Dev Only)"
+            onPress={() => {
+              resetDatabase();
+              alert('Database reset for development');
+            }}
+            color="red"
+          />
+        </>
+      )}
+
       <Text style={{ textAlign: 'center', marginTop: 10, fontSize: 16 }}>
         {tripSaved ? '✅ Trip saved with ML features!' : ''}
       </Text>

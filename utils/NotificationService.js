@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { isRunningInExpoGo } from './ExpoGoHelper';
+import { Platform } from 'react-native';
 
 // Configure notifications for Expo Go
 Notifications.setNotificationHandler({
@@ -52,25 +53,47 @@ export const registerForPushNotificationsAsync = async () => {
 };
 
 export const scheduleNotification = async (title, body, seconds) => {
-  try {
-    const id = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: title,
-        body: body,
-        data: { type: 'departure_reminder' },
-      },
-      trigger: {
-        seconds: seconds,
-      },
-    });
-    console.log('📱 Notification scheduled (Expo Go):', id);
-    return id;
-  } catch (error) {
-    console.error('Error scheduling notification:', error);
-  }
-};
-
-// ... rest of your existing functions
+    try {
+      console.log('📅 scheduleNotification called:');
+      console.log('Running in Expo Go:', isRunningInExpoGo());
+      console.log('Platform:', Platform.OS);
+      console.log('Seconds to wait:', seconds);
+      
+      if (seconds <= 0) {
+        throw new Error('Cannot schedule notification in the past');
+      }
+  
+      // Calculate target date
+      const targetDate = new Date();
+      targetDate.setSeconds(targetDate.getSeconds() + Math.round(seconds));
+      
+      console.log('📅 Current time:', new Date().toLocaleString());
+      console.log('📅 Target time:', targetDate.toLocaleString());
+  
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: title,
+          body: body,
+          data: { 
+            type: 'departure_reminder',
+            scheduledTime: targetDate.toISOString()
+          },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE, // ADD THIS LINE
+          date: targetDate,
+        },
+      });
+      
+      console.log('📱 Notification scheduled with explicit DATE type');
+      console.log('📱 Notification ID:', id);
+      
+      return id;
+    } catch (error) {
+      console.error('❌ Error scheduling notification:', error);
+      throw error;
+    }
+  };
 
 export const cancelNotification = async (notificationId) => {
   try {
