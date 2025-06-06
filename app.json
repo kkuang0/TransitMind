@@ -6,9 +6,7 @@
     "orientation": "portrait",
     "privacy": "public",
     "platforms": [
-      "ios",
-      "android",
-      "web"
+      "ios"
     ],
     "description": "Help build smart transit AI by sharing anonymous travel patterns",
     "icon": "./assets/icon.png",
@@ -38,7 +36,8 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
     "plugins": [
       "expo-sqlite",
@@ -54,6 +53,9 @@
     "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/32146c15-adba-4f49-8a2a-5a197d268caa"
-    }
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ]
   }
 }
