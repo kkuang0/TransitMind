@@ -1,34 +1,71 @@
-import React, { useState, useEffect } from 'react';
-import { SafeAreaView, Text, StyleSheet } from 'react-native';
-import { initDatabase, fetchTrips } from './utils/database';
+import React, { useEffect } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { initDatabase } from './utils/database';
+import { registerForPushNotificationsAsync } from './utils/NotificationService';
 import TripLogger from './components/TripLogger';
 import TripHistory from './components/TripHistory';
+import ReminderSetter from './components/ReminderSetter';
+
+const Tab = createBottomTabNavigator();
 
 export default function App() {
-  const [tripCount, setTripCount] = useState(0); 
-  const [trips, setTrips] = useState([]);
   useEffect(() => {
     (async () => {
-      console.log('🚀 useEffect started');
-  
+      console.log('🚀 App starting...');
+      
       try {
+        // Initialize database
         await initDatabase();
-        const data = await fetchTrips();
-        console.log('📦 Trip count:', data.length);
-        setTripCount(data.length);
+        console.log('✅ Database initialized');
+        
+        // Setup notifications
+        await registerForPushNotificationsAsync();
+        console.log('✅ Notifications registered');
       } catch (err) {
-        console.error('❌ DB error:', err);
+        console.error('❌ Initialization error:', err);
       }
     })();
   }, []);
-  
 
   return (
-    <SafeAreaView style={{ flex: 1, justifyContent: 'center', backgroundColor: '#ffffff' }}>
-      <Text style={{ textAlign: 'center', fontSize: 24, marginBottom: 20 }}>
-        🚆 TransitMind
-      </Text>
-      <TripLogger />
-    </SafeAreaView>
+    <NavigationContainer>
+      <Tab.Navigator
+        screenOptions={{
+          tabBarActiveTintColor: '#007AFF',
+          headerStyle: {
+            backgroundColor: '#f8f9fa',
+          },
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}
+      >
+        <Tab.Screen 
+          name="Logger" 
+          component={TripLogger}
+          options={{
+            title: '🚆 Log Trip',
+            tabBarLabel: 'Log Trip'
+          }}
+        />
+        <Tab.Screen 
+          name="History" 
+          component={TripHistory}
+          options={{
+            title: '📋 Trip History',
+            tabBarLabel: 'History'
+          }}
+        />
+        <Tab.Screen 
+          name="Reminders" 
+          component={ReminderSetter}
+          options={{
+            title: '⏰ Set Reminder',
+            tabBarLabel: 'Reminders'
+          }}
+        />
+      </Tab.Navigator>
+    </NavigationContainer>
   );
 }
