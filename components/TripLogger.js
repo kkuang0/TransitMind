@@ -3,6 +3,7 @@ import { View, Button, Text, TextInput } from 'react-native';
 import * as Location from 'expo-location';
 import { insertTrip, resetDatabase } from '../utils/database';
 import { buildMLFeatures } from '../utils/MLDataProcessor';
+import TransitWidget from './TransitWidget';
 
 export default function TripLogger() {
   const [destination, setDestination] = useState('');
@@ -72,6 +73,7 @@ export default function TripLogger() {
 
   return (
     <View style={{ padding: 20, backgroundColor: '#ffffff', flex: 1 }}>
+      <TransitWidget destination={destination} />
       <Text style={{ fontSize: 16, marginBottom: 10 }}>Where are you going?</Text>
       <TextInput
         style={{

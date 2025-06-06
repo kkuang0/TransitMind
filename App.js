@@ -5,7 +5,7 @@ import { initDatabase } from './utils/database';
 import { registerForPushNotificationsAsync } from './utils/NotificationService';
 import TripLogger from './components/TripLogger';
 import TripHistory from './components/TripHistory';
-import ReminderSetter from './components/ReminderSetter';
+import SmartReminder from './components/SmartReminder';
 
 const Tab = createBottomTabNavigator();
 
@@ -58,11 +58,11 @@ export default function App() {
           }}
         />
         <Tab.Screen 
-          name="Reminders" 
-          component={ReminderSetter}
+          name="SmartReminder" 
+          component={SmartReminder}
           options={{
-            title: '⏰ Set Reminder',
-            tabBarLabel: 'Reminders'
+            title: '🧠 Smart Planner',
+            tabBarLabel: 'Smart Planner'
           }}
         />
       </Tab.Navigator>
