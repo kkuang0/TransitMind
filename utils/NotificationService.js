@@ -1,48 +1,54 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import { isRunningInExpoGo } from './ExpoGoHelper';
 
-// Configure how notifications should be handled when app is running
+// Configure notifications for Expo Go
 Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
 });
 
 export const registerForPushNotificationsAsync = async () => {
-    let token;
-  
-    if (Device.isDevice) {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-      
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-      
-      if (finalStatus !== 'granted') {
-        alert('Failed to get push token for push notification!');
-        return;
-      }
-      
-      // For local notifications, we don't need the Expo push token
-      // Just check if we have permission
-      console.log('✅ Notification permissions granted');
-    } else {
-      // For simulator/emulator, still allow local notifications
+  let token;
+
+  if (isRunningInExpoGo()) {
+    console.log('📱 Running in Expo Go - notifications will work for local scheduling');
+  }
+
+  if (Device.isDevice) {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    
+    if (existingStatus !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') {
-        alert('Failed to get notification permissions!');
-        return;
-      }
-      console.log('✅ Notification permissions granted (simulator)');
+      finalStatus = status;
     }
-  
-    return 'local-notifications-enabled';
+    
+    if (finalStatus !== 'granted') {
+      console.log('Failed to get push notification permissions');
+      return;
+    }
+
+    // For Expo Go, we don't need push tokens for local notifications
+    if (!isRunningInExpoGo()) {
+      try {
+        token = (await Notifications.getExpoPushTokenAsync({
+          projectId: Constants.expoConfig.extra?.eas?.projectId,
+        })).data;
+      } catch (error) {
+        console.log('Push token error (this is normal in Expo Go):', error.message);
+      }
+    }
+  } else {
+    console.log('Must use physical device for Push Notifications');
+  }
+
+  return token || 'expo-go-local-notifications';
 };
 
 export const scheduleNotification = async (title, body, seconds) => {
@@ -57,12 +63,14 @@ export const scheduleNotification = async (title, body, seconds) => {
         seconds: seconds,
       },
     });
-    console.log('📱 Notification scheduled:', id);
+    console.log('📱 Notification scheduled (Expo Go):', id);
     return id;
   } catch (error) {
     console.error('Error scheduling notification:', error);
   }
 };
+
+// ... rest of your existing functions
 
 export const cancelNotification = async (notificationId) => {
   try {

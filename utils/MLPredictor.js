@@ -1,34 +1,36 @@
 import { fetchTrips } from './database';
 import { extractTimeFeatures } from './MLDataProcessor';
+import { enhancedSmartPrediction } from './OpenRouteService';
 
-// Mock LightGBM model - replace with real model later
-class MockLightGBMModel {
+// Enhanced ML model that combines multiple data sources
+class EnhancedMLModel {
   constructor() {
-    this.isTraned = false;
     this.featureWeights = {
       day_of_week: 0.15,
       hour_of_day: 0.25,
       is_weekend: 0.20,
-      distance: 0.30,
-      destination_pattern: 0.10
+      distance: 0.25,
+      route_data: 0.15
     };
   }
 
-  predict(features) {
-    // Simple prediction based on historical patterns + distance
+  predict(features, routeData = null) {
+    // Base prediction from distance
     const baseTime = features.distance / 1000 * 2; // 2 min per km baseline
     
-    // Add time-of-day effects
+    // Time-of-day effects
     const rushHourMultiplier = this.getRushHourMultiplier(features.hour_of_day);
     const weekendMultiplier = features.is_weekend ? 0.8 : 1.0;
     
-    const predictedTime = baseTime * rushHourMultiplier * weekendMultiplier;
+    // Route data influence
+    const routeMultiplier = routeData ? (routeData.durationMinutes / baseTime) : 1.0;
     
-    return Math.max(predictedTime, 1); // Minimum 1 minute
+    const predictedTime = baseTime * rushHourMultiplier * weekendMultiplier * routeMultiplier;
+    
+    return Math.max(predictedTime, 1);
   }
 
   getRushHourMultiplier(hour) {
-    // Rush hour effects: 7-9 AM and 5-7 PM
     if ((hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19)) {
       return 1.5; // 50% longer during rush hour
     } else if (hour >= 10 && hour <= 16) {
@@ -38,9 +40,9 @@ class MockLightGBMModel {
   }
 }
 
-const model = new MockLightGBMModel();
+const model = new EnhancedMLModel();
 
-export const predictTravelTime = async (destination, plannedDepartureTime, distance, startCoords, endCoords) => {
+export const predictTravelTimeEnhanced = async (destination, plannedDepartureTime, distance, startCoords, endCoords) => {
   try {
     // Get historical data for this destination
     const allTrips = await fetchTrips();
@@ -50,136 +52,103 @@ export const predictTravelTime = async (destination, plannedDepartureTime, dista
 
     console.log(`🧠 Found ${destinationTrips.length} historical trips to ${destination}`);
 
-    // Extract features for prediction
+    // Get real-time route data from OpenRouteService
+    const routePrediction = await enhancedSmartPrediction(
+      startCoords,
+      destination,
+      plannedDepartureTime,
+      destinationTrips
+    );
+
+    // Extract features for ML prediction
     const timeFeatures = extractTimeFeatures(plannedDepartureTime);
     const features = {
       day_of_week: timeFeatures.dayOfWeek,
       hour_of_day: timeFeatures.hourOfDay,
       is_weekend: timeFeatures.isWeekend,
-      distance: distance,
-      start_lat: startCoords.latitude,
-      start_lng: startCoords.longitude,
-      destination_encoded: hashDestination(destination)
+      distance: distance
     };
 
-    // Use historical average if we have enough data
+    // Use the enhanced route prediction as our primary source
     if (destinationTrips.length >= 3) {
-      const historicalAverage = calculateHistoricalAverage(destinationTrips, timeFeatures);
-      const mlPrediction = model.predict(features);
-      
-      // Blend historical data with ML prediction
-      const blendedPrediction = (historicalAverage * 0.7) + (mlPrediction * 0.3);
-      
-      console.log(`📊 Historical avg: ${historicalAverage.toFixed(1)}min, ML: ${mlPrediction.toFixed(1)}min, Blended: ${blendedPrediction.toFixed(1)}min`);
+      console.log(`📊 Using blended prediction: ${routePrediction.predictedMinutes.toFixed(1)}min`);
       
       return {
-        predictedTimeMinutes: blendedPrediction,
-        confidence: Math.min(destinationTrips.length / 10, 1.0), // Max confidence at 10+ trips
-        dataSource: 'historical_ml_blend'
+        predictedTimeMinutes: routePrediction.predictedMinutes,
+        confidence: routePrediction.confidence,
+        dataSource: 'enhanced_ml_route_historical',
+        routes: routePrediction.routes,
+        bestRoute: routePrediction.bestRoute,
+        historicalTrips: destinationTrips.length
       };
     } else {
-      // Use pure ML prediction for new destinations
-      const prediction = model.predict(features);
+      // For new destinations, use route + basic ML
+      const mlPrediction = model.predict(features, routePrediction.bestRoute);
+      const finalPrediction = (routePrediction.predictedMinutes * 0.8) + (mlPrediction * 0.2);
       
-      console.log(`🤖 Pure ML prediction: ${prediction.toFixed(1)}min (insufficient historical data)`);
+      console.log(`🤖 Route + ML prediction: ${finalPrediction.toFixed(1)}min`);
       
       return {
-        predictedTimeMinutes: prediction,
-        confidence: 0.3, // Lower confidence for new destinations
-        dataSource: 'ml_only'
+        predictedTimeMinutes: finalPrediction,
+        confidence: 0.6,
+        dataSource: 'route_ml_blend',
+        routes: routePrediction.routes,
+        bestRoute: routePrediction.bestRoute,
+        historicalTrips: destinationTrips.length
       };
     }
   } catch (error) {
-    console.error('❌ Error predicting travel time:', error);
+    console.error('❌ Error in enhanced prediction:', error);
     
-    // Fallback prediction
-    const fallbackTime = distance / 1000 * 2; // 2 min per km
+    // Fallback to simple prediction
+    const fallbackTime = distance / 1000 * 2;
     return {
       predictedTimeMinutes: Math.max(fallbackTime, 5),
-      confidence: 0.1,
-      dataSource: 'fallback'
+      confidence: 0.2,
+      dataSource: 'fallback',
+      routes: [],
+      historicalTrips: 0
     };
   }
 };
 
-const calculateHistoricalAverage = (trips, timeFeatures) => {
-  // Weight recent trips more heavily
-  const now = new Date();
-  const weightedTimes = trips.map(trip => {
-    const tripDate = new Date(trip.leave_time);
-    const daysDiff = (now - tripDate) / (1000 * 60 * 60 * 24);
-    const recencyWeight = Math.exp(-daysDiff / 30); // Exponential decay over 30 days
-    
-    // Similar time of day bonus
-    const hourDiff = Math.abs(trip.hour_of_day - timeFeatures.hourOfDay);
-    const timeWeight = hourDiff <= 2 ? 1.5 : 1.0;
-    
-    // Same day of week bonus
-    const dayWeight = trip.day_of_week === timeFeatures.dayOfWeek ? 1.3 : 1.0;
-    
-    return {
-      time: trip.travel_time_minutes,
-      weight: recencyWeight * timeWeight * dayWeight
-    };
-  });
-
-  const totalWeight = weightedTimes.reduce((sum, item) => sum + item.weight, 0);
-  const weightedAverage = weightedTimes.reduce((sum, item) => sum + (item.time * item.weight), 0) / totalWeight;
-  
-  return weightedAverage;
-};
-
-const hashDestination = (destination) => {
-  let hash = 0;
-  for (let i = 0; i < destination.length; i++) {
-    const char = destination.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash);
-};
-
-export const calculateOptimalDepartureTime = async (destination, arrivalTime, startCoords) => {
+export const calculateOptimalDepartureTimeEnhanced = async (destination, arrivalTime, startCoords) => {
   try {
-    const arrivalDate = new Date(arrivalTime);
-    
-    // Estimate distance (use average from historical trips or default)
+    // Get historical data
     const allTrips = await fetchTrips();
     const destinationTrips = allTrips.filter(trip => 
       trip.destination.toLowerCase() === destination.toLowerCase()
     );
-    
-    const averageDistance = destinationTrips.length > 0 
-      ? destinationTrips.reduce((sum, trip) => sum + trip.distance, 0) / destinationTrips.length
-      : 5000; // Default 5km if no history
 
-    // Predict travel time for arrival time
-    const prediction = await predictTravelTime(
-      destination, 
-      arrivalTime, 
-      averageDistance, 
-      startCoords, 
-      { latitude: 0, longitude: 0 } // End coords unknown for future trip
+    // Use OpenRouteService for smart calculation
+    const smartPrediction = await enhancedSmartPrediction(
+      startCoords,
+      destination,
+      arrivalTime,
+      destinationTrips
     );
 
-    // Add buffer time based on confidence
-    const bufferMinutes = prediction.confidence > 0.7 ? 5 : 10;
-    const totalTimeNeeded = prediction.predictedTimeMinutes + bufferMinutes;
+    // Calculate departure time with smart buffer
+    const bufferMinutes = smartPrediction.confidence > 0.7 ? 5 : 8;
+    const totalTimeNeeded = smartPrediction.predictedMinutes + bufferMinutes;
 
-    // Calculate departure time
+    const arrivalDate = new Date(arrivalTime);
     const departureTime = new Date(arrivalDate.getTime() - (totalTimeNeeded * 60 * 1000));
 
-    console.log(`🎯 For arrival at ${arrivalDate.toLocaleTimeString()}, leave by ${departureTime.toLocaleTimeString()}`);
+    console.log(`🎯 Smart departure: Leave by ${departureTime.toLocaleTimeString()} for ${arrivalDate.toLocaleTimeString()}`);
 
     return {
       departureTime,
-      predictedTravelTime: prediction.predictedTimeMinutes,
+      predictedTravelTime: smartPrediction.predictedMinutes,
       bufferTime: bufferMinutes,
-      confidence: prediction.confidence,
-      totalTimeNeeded
+      confidence: smartPrediction.confidence,
+      totalTimeNeeded,
+      routes: smartPrediction.routes,
+      bestRoute: smartPrediction.bestRoute,
+      destinationCoords: smartPrediction.destinationCoords
     };
   } catch (error) {
-    console.error('❌ Error calculating departure time:', error);
+    console.error('❌ Error calculating enhanced departure time:', error);
     throw error;
   }
 };

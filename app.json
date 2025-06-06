@@ -1,9 +1,16 @@
 {
   "expo": {
-    "name": "TransitMind",
-    "slug": "TransitMind",
+    "name": "TransitMind Research",
+    "slug": "transitmind-research",
     "version": "1.0.0",
     "orientation": "portrait",
+    "privacy": "public",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "description": "Help build smart transit AI by sharing anonymous travel patterns",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
@@ -15,21 +22,38 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.TransitMind"
+      "bundleIdentifier": "com.transitmind.research"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.TransitMind"
+      "package": "com.transitmind.research",
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-sqlite"
-    ]
+      "expo-sqlite",
+      "expo-location",
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "32146c15-adba-4f49-8a2a-5a197d268caa"
+      }
+    },
+    "owner": "kelvinkuang91",
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/32146c15-adba-4f49-8a2a-5a197d268caa"
+    }
   }
 }
