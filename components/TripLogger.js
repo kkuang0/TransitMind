@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Button, Text, TextInput } from 'react-native';
 import * as Location from 'expo-location';
-import { insertTrip } from '../utils/database';
+import { insertTrip, resetDatabase } from '../utils/database';
+import { buildMLFeatures } from '../utils/MLDataProcessor';
 
 export default function TripLogger() {
   const [destination, setDestination] = useState('');
@@ -25,6 +26,7 @@ export default function TripLogger() {
     setStartTime(new Date().toISOString());
     setStartLocation(location.coords);
     setTripSaved(false);
+    console.log('🚀 Trip started to:', destination);
   };
 
   const endTrip = async () => {
@@ -38,9 +40,21 @@ export default function TripLogger() {
       location.coords.longitude
     );
 
-    insertTrip(destination, startTime, endTime, distance);
+    // Build enhanced ML features
+    const mlFeatures = buildMLFeatures(
+      startTime,
+      endTime,
+      distance,
+      startLocation,
+      location.coords,
+      destination
+    );
+
+    console.log('🧠 ML Features:', mlFeatures);
+    
+    insertTrip(mlFeatures);
     setTripSaved(true);
-    setDestination(''); // Clear destination for next trip
+    setDestination('');
   };
 
   const getDistance = (lat1, lon1, lat2, lon2) => {
@@ -53,7 +67,7 @@ export default function TripLogger() {
     const a = Math.sin(Δφ / 2) ** 2 +
               Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // in meters
+    return R * c;
   };
 
   return (
@@ -75,8 +89,19 @@ export default function TripLogger() {
       <Button title="Start Trip" onPress={startTrip} />
       <View style={{ height: 10 }} />
       <Button title="End Trip" onPress={endTrip} disabled={!startLocation} />
+      
+      <View style={{ height: 20 }} />
+      <Button 
+        title="Reset Database (Dev)" 
+        onPress={() => {
+          resetDatabase();
+          alert('Database reset for ML development');
+        }} 
+        color="red"
+      />
+      
       <Text style={{ textAlign: 'center', marginTop: 10, fontSize: 16 }}>
-        {tripSaved ? '✅ Trip saved!' : ''}
+        {tripSaved ? '✅ Trip saved with ML features!' : ''}
       </Text>
     </View>
   );
